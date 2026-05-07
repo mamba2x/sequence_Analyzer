@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DNA &amp; RNA Sequence Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="page-shell">
+        <section class="hero-band">
+            <p class="eyebrow-label">CSC 442 Project 2</p>
+            <h1>DNA &amp; RNA Sequence Analyzer</h1>
+            <p class="hero-copy">
+                Paste a sequence, upload a file, or drag one in. The app detects the sequence type,
+                performs transcription and translation, explains every step in plain English,
+                and searches UniProt for real-world protein matches.
+            </p>
+        </section>
+
+        <section class="panel-card">
+            <form method="post" enctype="multipart/form-data" class="analysis-form">
+                <label for="sequence_text" class="field-label">Sequence input</label>
+                <textarea id="sequence_text" name="sequence_text" rows="8" placeholder="Paste DNA or RNA here, or include FASTA text..."></textarea>
+
+                <div class="upload-grid">
+                    <div class="file-column">
+                        <label for="sequence_file" class="field-label">Upload sequence file</label>
+                        <input id="sequence_file" name="sequence_file" type="file" accept=".txt,.fasta,.fa,.fna,.seq,text/plain">
+                        <p class="helper-line">Accepted examples: <code>.txt</code>, <code>.fasta</code>, <code>.fa</code></p>
+                    </div>
+
+                    <div id="drop_zone" class="drop-zone" tabindex="0">
+                        <p>Drag and drop a sequence file here</p>
+                        <span>or click this box after selecting a file above</span>
+                    </div>
+                </div>
+
+                <fieldset id="strand_panel" class="strand-panel">
+                    <legend>DNA strand type</legend>
+                    <label>
+                        <input type="radio" name="dna_strand" value="coding" checked>
+                        Non-template strand (coding / sense)
+                    </label>
+                    <label>
+                        <input type="radio" name="dna_strand" value="template">
+                        Template strand (antisense)
+                    </label>
+                </fieldset>
+
+                <button type="submit" class="submit-button">Analyze Sequence</button>
+            </form>
+        </section>
+
+        {% if rendered_snapshot %}
+        <section class="results-stack">
+            {% if rendered_snapshot.error_text %}
+            <article class="panel-card alert-card alert-error">
+                <h2>Input Problem</h2>
+                <p>{{ rendered_snapshot.error_text }}</p>
+                <p>{{ rendered_snapshot.detection_story }}</p>
+            </article>
+            {% else %}
+                {% if rendered_snapshot.warning_text %}
+                <article class="panel-card alert-card alert-warning">
+                    <h2>Note</h2>
+                    <p>{{ rendered_snapshot.warning_text }}</p>
+                </article>
+                {% endif %}
+
+                <article class="panel-card">
+                    <h2>1. Detection</h2>
+                    <div class="facts-grid">
+                        <div>
+                            <span class="facts-label">Input source</span>
+                            <strong>{{ rendered_snapshot.input_origin }}</strong>
+                        </div>
+                        <div>
+                            <span class="facts-label">Detected type</span>
+                            <strong>{{ rendered_snapshot.sequence_family }}</strong>
+                        </div>
+                        <div>
+                            <span class="facts-label">Cleaned sequence</span>
+                            <strong class="sequence-block">{{ rendered_snapshot.cleaned_sequence }}</strong>
+                        </div>
+                    </div>
+                    <p>{{ rendered_snapshot.detection_story }}</p>
+                </article>
+
+                <article class="panel-card">
+                    <h2>2. Transcription</h2>
+                    <div class="sequence-pair">
+                        <div>
+                            <span class="facts-label">Input sequence</span>
+                            <p class="sequence-block">{{ rendered_snapshot.cleaned_sequence }}</p>
+                        </div>
+                        <div>
+                            <span class="facts-label">mRNA result</span>
+                            <p class="sequence-block">{{ rendered_snapshot.mrna_result }}</p>
+                        </div>
+                    </div>
+                    <p>{{ rendered_snapshot.transcription_story }}</p>
+                </article>
+
+                <article class="panel-card">
+                    <h2>3. Translation</h2>
+                    <p>{{ rendered_snapshot.translation_story }}</p>
+                    {% if rendered_snapshot.codon_cards %}
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Codon</th>
+                                    <th>Amino Acid</th>
+                                    <th>Meaning</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for codon_item in rendered_snapshot.codon_cards %}
+                                <tr>
+                                    <td>{{ codon_item.position }}</td>
+                                    <td><code>{{ codon_item.codon }}</code></td>
+                                    <td>{{ codon_item.amino_name }} ({{ codon_item.amino_short }})</td>
+                                    <td>{{ codon_item.note }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="muted-line">No translated codons were produced.</p>
+                    {% endif %}
+                </article>
+
+                <article class="panel-card">
+                    <h2>4. Amino Acids / Polypeptide Chain</h2>
+                    <p>{{ rendered_snapshot.amino_story }}</p>
+                    {% if rendered_snapshot.residue_cards %}
+                    <div class="residue-grid">
+                        {% for residue_item in rendered_snapshot.residue_cards %}
+                        <div class="residue-card">
+                            <span class="residue-order">Residue {{ residue_item.position }}</span>
+                            <strong>{{ residue_item.full_name }}</strong>
+                            <p>{{ residue_item.three_letter }} / {{ residue_item.one_letter }}</p>
+                            <span class="pill-tag">{{ residue_item.group }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="muted-line">No amino-acid chain is available.</p>
+                    {% endif %}
+                </article>
+
+                <article class="panel-card">
+                    <h2>5. Protein &amp; Database Lookup</h2>
+                    <p>{{ rendered_snapshot.protein_story }}</p>
+
+                    <div class="facts-grid">
+                        <div>
+                            <span class="facts-label">Protein sequence</span>
+                            <strong class="sequence-block">{{ rendered_snapshot.protein_panel.protein_sequence or 'None produced' }}</strong>
+                        </div>
+                        <div>
+                            <span class="facts-label">Length</span>
+                            <strong>{{ rendered_snapshot.protein_panel.residue_total }} residues</strong>
+                        </div>
+                        <div>
+                            <span class="facts-label">Estimated mass</span>
+                            <strong>{{ rendered_snapshot.protein_panel.mass_estimate }} Da</strong>
+                        </div>
+                        <div>
+                            <span class="facts-label">Composition summary</span>
+                            <strong>{{ rendered_snapshot.protein_panel.composition_text }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="property-row">
+                        {% for property_item in rendered_snapshot.protein_panel.property_table %}
+                        <div class="property-tile">
+                            <span>{{ property_item.label }}</span>
+                            <strong>{{ property_item.count }}</strong>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    {% if rendered_snapshot.lookup_cards %}
+                    <div class="lookup-stack">
+                        {% for lookup_item in rendered_snapshot.lookup_cards %}
+                        <article class="lookup-card">
+                            <h3>{{ lookup_item.protein_name }}</h3>
+                            <p><strong>Organism:</strong> {{ lookup_item.organism_name }}</p>
+                            <p><strong>Accession:</strong> {{ lookup_item.accession_id }}</p>
+                            <p><strong>Function:</strong> {{ lookup_item.function_text }}</p>
+                        </article>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="muted-line">No live UniProt matches are available for this run.</p>
+                    {% endif %}
+                </article>
+            {% endif %}
+        </section>
+        {% endif %}
+    </main>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
